@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Navigation ──────────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand" id="site-name">Photography</a>
+    <button class="nav-toggle" aria-label="Menu" id="nav-toggle">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/portfolio.html" class="active">Portfolio</a></li>
+      <li><a href="/about.html">About</a></li>
+      <li><a href="/contact.html">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── Page Header ─────────────────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>Portfolio</h1>
+    <p>A collection of moments captured through my lens</p>
+  </header>
+
+  <!-- ── Gallery ─────────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="container">
+      <!-- Category filter – populated by JS -->
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-btn active" data-cat="all">All</button>
+      </div>
+
+      <!-- Photo grid – masonry layout -->
+      <div class="masonry" id="photo-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Lightbox ─────────────────────────────────────────────────────────────── -->
+  <div class="lightbox" id="lightbox">
+    <button class="lb-close" id="lb-close">&#x2715;</button>
+    <button class="lb-prev"  id="lb-prev">&#8592;</button>
+    <button class="lb-next"  id="lb-next">&#8594;</button>
+    <div>
+      <img src="" alt="" id="lb-img" />
+      <div class="lightbox-caption">
+        <strong id="lb-title"></strong>
+        <span id="lb-caption"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+  <footer>
+    <p id="footer-text">&copy; <span id="year"></span> Photography. All rights reserved.</p>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    let allPhotos = [];
+    let filtered  = [];
+
+    async function loadPortfolio() {
+      const [settings, photos, categories] = await Promise.all([
+        fetch('/api/settings').then(r => r.json()),
+        fetch('/api/photos').then(r => r.json()),
+        fetch('/api/categories').then(r => r.json()),
+      ]);
+
+      // Apply settings
+      document.title = `Portfolio — ${settings.site_name || 'Photography'}`;
+      document.getElementById('site-name').textContent = settings.site_name || 'Photography';
+      document.getElementById('year').textContent = new Date().getFullYear();
+      document.getElementById('footer-text').innerHTML =
+        `&copy; ${new Date().getFullYear()} ${settings.site_name || 'Photography'}. All rights reserved.`;
+
+      allPhotos = photos;
+
+      // Build category filter buttons
+      const bar = document.getElementById('filter-bar');
+      categories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-btn';
+        btn.dataset.cat = cat.category;
+        btn.textContent = `${cap(cat.category)} (${cat.count})`;
+        bar.appendChild(btn);
+      });
+
+      bar.addEventListener('click', e => {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        bar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const cat = btn.dataset.cat;
+        filtered = cat === 'all' ? allPhotos : allPhotos.filter(p => p.category === cat);
+        renderGrid(filtered);
+      });
+
+      filtered = allPhotos;
+      renderGrid(filtered);
+    }
+
+    function renderGrid(photos) {
+      const grid = document.getElementById('photo-grid');
+      if (!photos.length) {
+        grid.innerHTML = '<div class="empty-state"><p>No photos in this category.</p></div>';
+        return;
+      }
+      grid.innerHTML = photos.map((p, i) => `
+        <div class="photo-item" data-index="${i}">
+          <img src="/uploads/${p.filename}" alt="${escHtml(p.title || p.original_name)}" loading="lazy" />
+          <div class="photo-overlay">
+            ${p.title   ? `<div class="photo-overlay-title">${escHtml(p.title)}</div>` : ''}
+            ${p.caption ? `<div class="photo-overlay-caption">${escHtml(p.caption)}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      initLightbox(filtered, grid);
+    }
+
+    // Capitalize first letter
+    function cap(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
+
+    loadPortfolio();
+  </script>
+</body>
+</html>

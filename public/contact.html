@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Navigation ──────────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand" id="site-name">Photography</a>
+    <button class="nav-toggle" aria-label="Menu" id="nav-toggle">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/portfolio.html">Portfolio</a></li>
+      <li><a href="/about.html">About</a></li>
+      <li><a href="/contact.html" class="active">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── Page Header ─────────────────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>Contact</h1>
+    <p>Let's work together</p>
+  </header>
+
+  <!-- ── Contact Section ─────────────────────────────────────────────────────── -->
+  <section>
+    <div class="contact-layout">
+
+      <!-- Left: info -->
+      <div class="contact-info">
+        <h3>Get In Touch</h3>
+        <p id="contact-intro">I'd love to hear about your project. Send a message and I'll get back to you soon.</p>
+
+        <div class="contact-detail">
+          <strong>Email</strong>
+          <a id="contact-email" href="#">—</a>
+        </div>
+        <div class="contact-detail">
+          <strong>Phone</strong>
+          <span id="contact-phone">—</span>
+        </div>
+
+        <!-- Social links -->
+        <div class="social-row" id="social-row"></div>
+      </div>
+
+      <!-- Right: form -->
+      <div>
+        <div class="form-msg" id="form-msg"></div>
+        <form id="contact-form" novalidate>
+          <div class="form-group">
+            <label for="f-name">Your Name</label>
+            <input type="text" id="f-name" name="name" placeholder="Jane Doe" required />
+          </div>
+          <div class="form-group">
+            <label for="f-email">Email Address</label>
+            <input type="email" id="f-email" name="email" placeholder="jane@example.com" required />
+          </div>
+          <div class="form-group">
+            <label for="f-msg">Message</label>
+            <textarea id="f-msg" name="message" placeholder="Tell me about your project…" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-solid" id="submit-btn">Send Message</button>
+        </form>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+  <footer>
+    <p id="footer-text">&copy; <span id="year"></span> Photography. All rights reserved.</p>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    // Social icons map
+    const ICONS = {
+      social_instagram: { label: 'Instagram', html: 'IG' },
+      social_facebook:  { label: 'Facebook',  html: 'FB' },
+      social_twitter:   { label: 'Twitter/X', html: 'TW' },
+    };
+
+    (async () => {
+      const settings = await fetch('/api/settings').then(r => r.json());
+
+      document.title = `Contact — ${settings.site_name || 'Photography'}`;
+      document.getElementById('site-name').textContent = settings.site_name || 'Photography';
+      document.getElementById('year').textContent = new Date().getFullYear();
+      document.getElementById('footer-text').innerHTML =
+        `&copy; ${new Date().getFullYear()} ${settings.site_name || 'Photography'}. All rights reserved.`;
+
+      if (settings.contact_email) {
+        const el = document.getElementById('contact-email');
+        el.href = `mailto:${settings.contact_email}`;
+        el.textContent = settings.contact_email;
+      }
+      if (settings.contact_phone) {
+        document.getElementById('contact-phone').textContent = settings.contact_phone;
+      }
+
+      // Social links
+      const row = document.getElementById('social-row');
+      for (const [key, info] of Object.entries(ICONS)) {
+        if (settings[key]) {
+          const a = document.createElement('a');
+          a.href = settings[key]; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          a.className = 'social-btn'; a.title = info.label;
+          a.textContent = info.html;
+          row.appendChild(a);
+        }
+      }
+    })();
+
+    // Contact form submission
+    document.getElementById('contact-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const msg = document.getElementById('form-msg');
+      msg.className = 'form-msg';
+
+      const body = {
+        name:    document.getElementById('f-name').value.trim(),
+        email:   document.getElementById('f-email').value.trim(),
+        message: document.getElementById('f-msg').value.trim(),
+      };
+
+      if (!body.name || !body.email || !body.message) {
+        msg.textContent = 'Please fill in all fields.';
+        msg.classList.add('err');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      try {
+        const res  = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = data.message;
+          msg.classList.add('ok');
+          e.target.reset();
+        } else {
+          msg.textContent = data.error || 'Something went wrong.';
+          msg.classList.add('err');
+        }
+      } catch {
+        msg.textContent = 'Network error. Please try again.';
+        msg.classList.add('err');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Message';
+      }
+    });
+  </script>
+</body>
+</html>

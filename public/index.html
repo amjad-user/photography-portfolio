@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photography Portfolio</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Navigation ──────────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand" id="site-name">Photography</a>
+    <button class="nav-toggle" aria-label="Menu" id="nav-toggle">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="/"            class="active">Home</a></li>
+      <li><a href="/portfolio.html">Portfolio</a></li>
+      <li><a href="/about.html">About</a></li>
+      <li><a href="/contact.html">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── Hero ────────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-bg" id="hero-bg">
+      <img src="" alt="" id="hero-img" style="display:none" />
+    </div>
+    <div class="hero-content">
+      <p class="hero-eyebrow">Welcome</p>
+      <h1 class="hero-title" id="hero-title">Photography</h1>
+      <p class="hero-tagline" id="hero-tagline">Capturing moments that last a lifetime</p>
+      <a href="/portfolio.html" class="btn btn-solid">View Portfolio</a>
+    </div>
+    <div class="scroll-cue">Scroll</div>
+  </section>
+
+  <!-- ── Featured Photos ─────────────────────────────────────────────────────── -->
+  <section>
+    <div class="container">
+      <div class="section-header">
+        <p class="section-label">Selected Work</p>
+        <h2 class="section-title">Featured Images</h2>
+      </div>
+      <div class="photo-grid" id="featured-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div style="text-align:center; margin-top:3rem;">
+        <a href="/portfolio.html" class="btn">View Full Portfolio</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Lightbox ─────────────────────────────────────────────────────────────── -->
+  <div class="lightbox" id="lightbox">
+    <button class="lb-close" id="lb-close">&#x2715;</button>
+    <button class="lb-prev"  id="lb-prev">&#8592;</button>
+    <button class="lb-next"  id="lb-next">&#8594;</button>
+    <div>
+      <img src="" alt="" id="lb-img" />
+      <div class="lightbox-caption">
+        <strong id="lb-title"></strong>
+        <span id="lb-caption"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+  <footer>
+    <p id="footer-text">&copy; <span id="year"></span> Photography. All rights reserved.</p>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    // Load settings and featured photos
+    (async () => {
+      const [settings, photos] = await Promise.all([
+        fetch('/api/settings').then(r => r.json()),
+        fetch('/api/photos/featured').then(r => r.json()),
+      ]);
+
+      // Apply settings
+      document.title = settings.site_name || 'Photography';
+      document.getElementById('site-name').textContent  = settings.site_name || 'Photography';
+      document.getElementById('hero-title').textContent = settings.site_name || 'Photography';
+      document.getElementById('hero-tagline').textContent = settings.hero_tagline || '';
+      document.getElementById('year').textContent = new Date().getFullYear();
+      document.getElementById('footer-text').innerHTML =
+        `&copy; ${new Date().getFullYear()} ${settings.site_name || 'Photography'}. All rights reserved.`;
+
+      if (settings.hero_image) {
+        const img = document.getElementById('hero-img');
+        img.src = settings.hero_image;
+        img.style.display = 'block';
+      }
+
+      // Render featured grid
+      const grid = document.getElementById('featured-grid');
+      if (!photos.length) {
+        grid.innerHTML = '<div class="empty-state"><p>No featured photos yet.</p></div>';
+        return;
+      }
+      grid.innerHTML = photos.map((p, i) => `
+        <div class="photo-item" data-index="${i}">
+          <img src="/uploads/${p.filename}" alt="${escHtml(p.title || p.original_name)}" loading="lazy" />
+          <div class="photo-overlay">
+            ${p.title ? `<div class="photo-overlay-title">${escHtml(p.title)}</div>` : ''}
+            ${p.caption ? `<div class="photo-overlay-caption">${escHtml(p.caption)}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      initLightbox(photos, grid);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Photography</title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     LOGIN SCREEN
+═════════════════════════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <p class="login-logo">Photography &mdash; Admin</p>
+    <h1>Sign In</h1>
+    <p>Enter your credentials to access the dashboard.</p>
+    <div class="login-error" id="login-error"></div>
+    <form id="login-form">
+      <div class="field">
+        <label for="l-email">Email Address</label>
+        <input type="email" id="l-email" placeholder="admin@example.com" required autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="l-pass">Password</label>
+        <input type="password" id="l-pass" placeholder="••••••••" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:.5rem;" id="login-btn">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     ADMIN APP SHELL
+═════════════════════════════════════════════════════════════════════════════ -->
+<div id="admin-app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">Admin Panel</div>
+    <nav class="sidebar-nav">
+      <a href="#" data-section="dashboard" class="active">
+        &#9632; &nbsp;Dashboard
+      </a>
+      <a href="#" data-section="photos">
+        &#9724; &nbsp;Photos
+      </a>
+      <a href="#" data-section="content">
+        &#9998; &nbsp;Content
+      </a>
+      <a href="#" data-section="messages">
+        &#9993; &nbsp;Messages
+        <span class="badge" id="unread-badge" style="display:none"></span>
+      </a>
+      <a href="#" data-section="settings">
+        &#9881; &nbsp;Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <strong id="admin-email-display">admin</strong>
+      <a href="#" id="logout-btn">Sign out</a>
+      &nbsp;|&nbsp;
+      <a href="/" target="_blank">View site &#8599;</a>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content">
+
+    <!-- ── DASHBOARD ───────────────────────────────────────────────────────── -->
+    <section id="sec-dashboard" class="admin-section">
+      <h2 class="page-title">Dashboard</h2>
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="st-photos">—</div><div class="stat-label">Total Photos</div></div>
+        <div class="stat-card highlight"><div class="stat-value" id="st-featured">—</div><div class="stat-label">Featured</div></div>
+        <div class="stat-card"><div class="stat-value" id="st-cats">—</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card"><div class="stat-value" id="st-msgs">—</div><div class="stat-label">Messages</div></div>
+        <div class="stat-card highlight"><div class="stat-value" id="st-unread">—</div><div class="stat-label">Unread</div></div>
+      </div>
+      <div class="panel">
+        <p class="panel-title">Quick Links</p>
+        <div class="btn-group" style="margin-top:0;">
+          <button class="btn" onclick="switchSection('photos')">Manage Photos</button>
+          <button class="btn" onclick="switchSection('content')">Edit Content</button>
+          <button class="btn" onclick="switchSection('messages')">View Messages</button>
+          <a href="/" target="_blank" class="btn">View Public Site &#8599;</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PHOTOS ──────────────────────────────────────────────────────────── -->
+    <section id="sec-photos" class="admin-section" style="display:none">
+      <h2 class="page-title">Photo Management</h2>
+
+      <!-- Upload panel -->
+      <div class="panel">
+        <p class="panel-title">Upload Photos</p>
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="upload-input" multiple accept="image/*" />
+          <p>Drag &amp; drop images here, or <strong>click to browse</strong></p>
+          <p style="margin-top:.4rem;font-size:.78rem;">JPEG, PNG, WebP &bull; Max 10 MB each &bull; Multiple files allowed</p>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Title (applied to all uploaded photos)</label>
+            <input type="text" id="up-title" placeholder="Optional title" />
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <select id="up-category">
+              <option value="uncategorized">Uncategorized</option>
+              <option value="portraits">Portraits</option>
+              <option value="landscapes">Landscapes</option>
+              <option value="events">Events</option>
+              <option value="architecture">Architecture</option>
+              <option value="street">Street</option>
+              <option value="nature">Nature</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Caption</label>
+          <input type="text" id="up-caption" placeholder="Optional caption" />
+        </div>
+        <label class="field-check">
+          <input type="checkbox" id="up-featured" />
+          Mark as featured (shown on homepage)
+        </label>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" id="upload-btn">Upload Selected Photos</button>
+        </div>
+        <div class="alert" id="upload-alert"></div>
+
+        <!-- Upload preview thumbnails -->
+        <div id="upload-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem;"></div>
+      </div>
+
+      <!-- Existing photos -->
+      <div class="panel">
+        <p class="panel-title">All Photos</p>
+        <div id="photos-loading" class="loading"><div class="spinner"></div></div>
+        <div class="admin-photo-grid" id="photos-grid" style="display:none"></div>
+        <div class="empty-state" id="photos-empty" style="display:none"><p>No photos uploaded yet.</p></div>
+      </div>
+    </section>
+
+    <!-- ── CONTENT ─────────────────────────────────────────────────────────── -->
+    <section id="sec-content" class="admin-section" style="display:none">
+      <h2 class="page-title">Content Editing</h2>
+      <div class="alert" id="content-alert"></div>
+
+      <!-- Homepage -->
+      <div class="panel">
+        <p class="panel-title">Homepage</p>
+        <div class="field">
+          <label>Site / Photographer Name</label>
+          <input type="text" id="c-site-name" placeholder="Alex Morgan Photography" />
+        </div>
+        <div class="field">
+          <label>Hero Tagline</label>
+          <input type="text" id="c-hero-tagline" placeholder="Capturing moments that last a lifetime" />
+        </div>
+        <div class="field">
+          <label>Hero Subtitle</label>
+          <input type="text" id="c-hero-subtitle" placeholder="Professional photographer based in…" />
+        </div>
+        <div class="field">
+          <label>Hero Background Image</label>
+          <img id="hero-img-preview" class="img-preview landscape" src="" alt="" style="display:none;margin-bottom:.8rem;" />
+          <div class="upload-zone" style="padding:1.2rem;" id="hero-img-zone">
+            <input type="file" id="hero-img-input" accept="image/*" />
+            <p>Click to upload hero background image</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- About -->
+      <div class="panel">
+        <p class="panel-title">About Page</p>
+        <div class="field">
+          <label>Bio / Description</label>
+          <textarea id="c-about-bio" placeholder="Tell your story…"></textarea>
+        </div>
+        <div class="field">
+          <label>Profile Photo</label>
+          <img id="about-img-preview" class="img-preview" src="" alt="" style="display:none;margin-bottom:.8rem;" />
+          <div class="upload-zone" style="padding:1.2rem;" id="about-img-zone">
+            <input type="file" id="about-img-input" accept="image/*" />
+            <p>Click to upload profile photo</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact info -->
+      <div class="panel">
+        <p class="panel-title">Contact Information</p>
+        <div class="field-row">
+          <div class="field">
+            <label>Email</label>
+            <input type="email" id="c-contact-email" placeholder="hello@example.com" />
+          </div>
+          <div class="field">
+            <label>Phone</label>
+            <input type="text" id="c-contact-phone" placeholder="+1 (555) 000-0000" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Instagram URL</label>
+          <input type="url" id="c-instagram" placeholder="https://instagram.com/yourhandle" />
+        </div>
+        <div class="field">
+          <label>Facebook URL</label>
+          <input type="url" id="c-facebook" placeholder="https://facebook.com/yourpage" />
+        </div>
+        <div class="field">
+          <label>Twitter / X URL</label>
+          <input type="url" id="c-twitter" placeholder="https://twitter.com/yourhandle" />
+        </div>
+      </div>
+
+      <div class="btn-group" style="margin-top:0;">
+        <button class="btn btn-primary" id="save-content-btn">Save All Changes</button>
+      </div>
+    </section>
+
+    <!-- ── MESSAGES ────────────────────────────────────────────────────────── -->
+    <section id="sec-messages" class="admin-section" style="display:none">
+      <h2 class="page-title">Messages</h2>
+      <div id="msgs-loading" class="loading"><div class="spinner"></div></div>
+      <div id="msgs-list"></div>
+      <div class="empty-state" id="msgs-empty" style="display:none"><p>No messages yet.</p></div>
+    </section>
+
+    <!-- ── SETTINGS ────────────────────────────────────────────────────────── -->
+    <section id="sec-settings" class="admin-section" style="display:none">
+      <h2 class="page-title">Settings</h2>
+      <div class="panel" style="max-width:460px;">
+        <p class="panel-title">Change Password</p>
+        <div class="alert" id="pw-alert"></div>
+        <div class="field">
+          <label>Current Password</label>
+          <input type="password" id="pw-current" autocomplete="current-password" />
+        </div>
+        <div class="field">
+          <label>New Password</label>
+          <input type="password" id="pw-new" autocomplete="new-password" placeholder="Min 8 characters" />
+        </div>
+        <div class="field">
+          <label>Confirm New Password</label>
+          <input type="password" id="pw-confirm" autocomplete="new-password" />
+        </div>
+        <div class="btn-group" style="margin-top:0;">
+          <button class="btn btn-primary" id="pw-btn">Update Password</button>
+        </div>
+      </div>
+    </section>
+
+  </main><!-- /main-content -->
+</div><!-- /admin-app -->
+
+<!-- ── Edit Photo Modal ───────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Edit Photo</h3>
+      <button class="modal-close" id="modal-close">&#x2715;</button>
+    </div>
+    <img id="modal-preview" src="" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:1.2rem;" />
+    <input type="hidden" id="modal-id" />
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="modal-title" />
+    </div>
+    <div class="field">
+      <label>Caption</label>
+      <input type="text" id="modal-caption" />
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="modal-category">
+        <option value="uncategorized">Uncategorized</option>
+        <option value="portraits">Portraits</option>
+        <option value="landscapes">Landscapes</option>
+        <option value="events">Events</option>
+        <option value="architecture">Architecture</option>
+        <option value="street">Street</option>
+        <option value="nature">Nature</option>
+      </select>
+    </div>
+    <label class="field-check" style="margin-bottom:1.2rem;">
+      <input type="checkbox" id="modal-featured" />
+      Featured (show on homepage)
+    </label>
+    <div class="btn-group" style="margin-top:0;">
+      <button class="btn btn-primary" id="modal-save">Save Changes</button>
+      <button class="btn" id="modal-cancel">Cancel</button>
+    </div>
+    <div class="alert" id="modal-alert"></div>
+  </div>
+</div>
+
+<!-- Mobile sidebar toggle -->
+<button class="sidebar-toggle" id="sidebar-toggle">&#9776;</button>
+
+<script src="/js/admin.js"></script>
+</body>
+</html>

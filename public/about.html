@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Navigation ──────────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand" id="site-name">Photography</a>
+    <button class="nav-toggle" aria-label="Menu" id="nav-toggle">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/portfolio.html">Portfolio</a></li>
+      <li><a href="/about.html" class="active">About</a></li>
+      <li><a href="/contact.html">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── Page Header ─────────────────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>About</h1>
+    <p>The story behind the lens</p>
+  </header>
+
+  <!-- ── About Section ───────────────────────────────────────────────────────── -->
+  <section>
+    <div class="about-layout" id="about-layout">
+      <!-- Profile image -->
+      <div class="about-img-wrap">
+        <img id="about-img" src="" alt="Photographer" style="background:#222;" />
+      </div>
+
+      <!-- Bio text -->
+      <div class="about-text">
+        <p class="section-label">About Me</p>
+        <h2 id="about-name">Loading…</h2>
+        <p id="about-bio"></p>
+        <a href="/contact.html" class="btn">Get In Touch</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+  <footer>
+    <p id="footer-text">&copy; <span id="year"></span> Photography. All rights reserved.</p>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (async () => {
+      const settings = await fetch('/api/settings').then(r => r.json());
+
+      document.title = `About — ${settings.site_name || 'Photography'}`;
+      document.getElementById('site-name').textContent = settings.site_name || 'Photography';
+      document.getElementById('about-name').textContent = settings.site_name || 'Photography';
+      document.getElementById('year').textContent = new Date().getFullYear();
+      document.getElementById('footer-text').innerHTML =
+        `&copy; ${new Date().getFullYear()} ${settings.site_name || 'Photography'}. All rights reserved.`;
+
+      document.getElementById('about-bio').textContent = settings.about_bio || '';
+
+      const img = document.getElementById('about-img');
+      if (settings.about_image) {
+        img.src = settings.about_image;
+        img.alt = settings.site_name || 'Photographer';
+      } else {
+        // Placeholder gradient
+        img.style.cssText = 'width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);border-radius:20px;';
+      }
+    })();
+  </script>
+</body>
+</html>
