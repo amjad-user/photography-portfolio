@@ -115,7 +115,8 @@
       }
       grid.innerHTML = photos.map((p, i) => `
         <div class="photo-item" data-index="${i}">
-          <img src="/uploads/${p.filename}" alt="${escHtml(p.title || p.original_name)}" loading="lazy" />
+          <img src="${escHtml(p.image_url)}" alt="${escHtml(p.title || p.original_name)}" loading="lazy"
+               onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />
           <div class="photo-overlay">
             ${p.title   ? `<div class="photo-overlay-title">${escHtml(p.title)}</div>` : ''}
             ${p.caption ? `<div class="photo-overlay-caption">${escHtml(p.caption)}</div>` : ''}

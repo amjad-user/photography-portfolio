@@ -48,7 +48,7 @@ function initLightbox(photos, grid) {
   function open(index) {
     current = (index + photos.length) % photos.length;
     const p = photos[current];
-    lbImg.src         = `/uploads/${p.filename}`;
+    lbImg.src         = p.image_url || '';
     lbImg.alt         = p.title || p.original_name || '';
     lbTitle.textContent  = p.title   || '';
     lbCap.textContent    = p.caption || '';

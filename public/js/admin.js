@@ -165,7 +165,8 @@ async function loadPhotos() {
   grid.style.display = 'grid';
   grid.innerHTML = photos.map(p => `
     <div class="admin-photo-card" id="photo-card-${p.id}">
-      <img src="/uploads/${escAdmin(p.filename)}" alt="${escAdmin(p.title || p.original_name)}" loading="lazy" />
+      <img src="${escAdmin(p.image_url)}" alt="${escAdmin(p.title || p.original_name)}" loading="lazy"
+             onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />
       <div class="admin-photo-info">
         <div class="admin-photo-name" title="${escAdmin(p.title || p.original_name)}">${escAdmin(p.title || p.original_name || 'Untitled')}</div>
         <div class="admin-photo-meta">${escAdmin(p.category)} &bull; ${formatDate(p.created_at)}</div>
@@ -256,7 +257,7 @@ async function openEditModal(id) {
   if (!photo) return;
 
   document.getElementById('modal-id').value          = photo.id;
-  document.getElementById('modal-preview').src       = `/uploads/${photo.filename}`;
+  document.getElementById('modal-preview').src       = photo.image_url || '';
   document.getElementById('modal-title').value       = photo.title    || '';
   document.getElementById('modal-caption').value     = photo.caption  || '';
   document.getElementById('modal-category').value    = photo.category || 'uncategorized';

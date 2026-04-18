@@ -3,7 +3,7 @@
  */
 const express    = require('express');
 const router     = express.Router();
-const { supabase } = require('../db/init');
+const supabase = require('../supabase/client');
 
 // ── Site settings ─────────────────────────────────────────────────────────────
 router.get('/settings', async (_req, res) => {
