@@ -117,8 +117,7 @@
         const isVideo = p.media_type === 'video';
         return `
           <div class="photo-item${isVideo ? ' video-item' : ''}" data-index="${i}">
-            <img src="${escHtml(p.image_url)}" alt="${escHtml(p.title || p.original_name)}" loading="lazy"
-                 onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />
+            ${mediaThumb(p)}
             ${isVideo ? '<div class="play-overlay"><span class="play-btn">&#9654;</span></div>' : ''}
             <div class="photo-overlay">
               ${p.title   ? `<div class="photo-overlay-title">${escHtml(p.title)}</div>` : ''}

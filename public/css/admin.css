@@ -282,7 +282,8 @@ button { font-family: var(--sans); cursor: pointer; }
   transition: transform var(--ease), box-shadow var(--ease);
 }
 .admin-photo-card:hover { transform: translateY(-3px); box-shadow: 0 16px 48px rgba(0,0,0,0.42); }
-.admin-photo-card img   { width: 100%; height: 140px; object-fit: cover; }
+.admin-photo-card img,
+.admin-photo-card video { width: 100%; height: 140px; object-fit: cover; display: block; }
 .admin-photo-info       { padding: .72rem .88rem; }
 .admin-photo-name       { font-size: .8rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: .3rem; }
 .admin-photo-meta       { font-size: .72rem; color: var(--muted); margin-bottom: .6rem; }

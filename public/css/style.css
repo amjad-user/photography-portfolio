@@ -264,11 +264,17 @@ section    { padding: 6rem 2rem; }
   transform: translateY(-5px) scale(1.01);
   box-shadow: 0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.11);
 }
-.photo-item img {
+.photo-item img,
+.photo-item video {
   width: 100%; height: 280px; object-fit: cover;
   transition: transform .65s cubic-bezier(0.25,0.46,0.45,0.94);
 }
-.photo-item:hover img { transform: scale(1.06); }
+.photo-item:hover img,
+.photo-item:hover video { transform: scale(1.06); }
+
+/* Masonry variant overrides height:auto for images; mirror for video */
+.masonry .photo-item img,
+.masonry .photo-item video { height: auto; }
 
 .photo-overlay {
   position: absolute; inset: 0;

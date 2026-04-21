@@ -25,6 +25,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ── Media thumbnail helper ────────────────────────────────────────────────────
+/**
+ * Returns the HTML string for a thumbnail element inside a grid card.
+ * Priority: image_url > YouTube CDN > direct video (<video>) > dark placeholder.
+ * Always uses alt="" so broken states never show a raw filename.
+ */
+function mediaThumb(p) {
+  const imgStyle = 'width:100%;height:100%;object-fit:cover;display:block;';
+
+  // 1. Explicit thumbnail / poster image — works for all media types
+  if (p.image_url) {
+    return `<img src="${escHtml(p.image_url)}" alt="" loading="lazy"
+                 style="${imgStyle}"
+                 onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />`;
+  }
+
+  if (p.media_type === 'video' && p.video_url) {
+    // 2. YouTube embed → derive thumbnail from YouTube's public image CDN (no API key)
+    const yt = p.video_url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/);
+    if (yt) {
+      return `<img src="https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg" alt="" loading="lazy"
+                   style="${imgStyle}"
+                   onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />`;
+    }
+
+    // 3. Direct video file — browser renders the first frame automatically
+    if (/\.(mp4|webm|mov)(\?|$)/i.test(p.video_url)) {
+      return `<video src="${escHtml(p.video_url)}" preload="metadata" muted playsinline
+                     style="${imgStyle}pointer-events:none;"></video>`;
+    }
+  }
+
+  // 4. Vimeo or unknown embed — dark placeholder (Vimeo needs API for CDN thumb)
+  return `<div style="${imgStyle}background:#111;"></div>`;
+}
+
 // ── Lightbox ──────────────────────────────────────────────────────────────────
 /**
  * Wires up lightbox behaviour for a photo/video grid.
