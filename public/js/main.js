@@ -36,7 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
  * cross-browser thumbnail strategy.
  */
 function mediaThumb(p) {
-  const imgStyle = 'width:100%;height:100%;object-fit:cover;display:block;';
+  // No height:100% — let the CSS rule (.photo-item img { height:280px }) take effect.
+  // Inline height:100% would win over class rules and collapse inside an auto-height parent.
+  const imgStyle = 'width:100%;object-fit:cover;display:block;';
 
   // 1. Uploaded thumbnail / poster image — best result, works everywhere
   if (p.image_url) {
@@ -55,9 +57,9 @@ function mediaThumb(p) {
     }
   }
 
-  // 3. No thumbnail available — dark card. The .play-overlay on the parent card
-  //    adds the visible play icon on top of this.
-  return `<div style="${imgStyle}background:#111;"></div>`;
+  // 3. No thumbnail available — dark card with explicit height so the card isn't invisible.
+  //    The .play-overlay on the parent card adds the visible play icon on top of this.
+  return `<div style="width:100%;height:280px;background:#111;"></div>`;
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
