@@ -501,6 +501,46 @@ footer a { color: var(--accent); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Video play overlay on grid cards ────────────────────────────────────────── */
+.play-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.play-btn {
+  width: 52px; height: 52px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255,255,255,0.28);
+  border-radius: 50%;
+  color: #fff; font-size: 1.2rem;
+  display: flex; align-items: center; justify-content: center;
+  padding-left: 3px; /* optical centering of triangle */
+  transition: transform var(--ease), background var(--ease);
+}
+.photo-item:hover .play-btn {
+  transform: scale(1.12);
+  background: rgba(212,168,83,0.65);
+}
+
+/* ── Lightbox media container ────────────────────────────────────────────────── */
+#lb-media { display: flex; align-items: center; justify-content: center; }
+#lb-media img {
+  max-width: 88vw; max-height: 80vh; object-fit: contain;
+  border-radius: var(--r);
+  box-shadow: 0 48px 120px rgba(0,0,0,0.85);
+}
+
+/* ── Category filter — horizontal scroll on mobile (no wrapping) ─────────────── */
+.filter-bar {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+
 /* ── Responsive ──────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) { .masonry { columns: 2; } }
 
@@ -525,12 +565,25 @@ footer a { color: var(--accent); }
   .about-layout     { grid-template-columns: 1fr; gap: 2.5rem; }
   .about-img-wrap   { max-width: 280px; margin: 0 auto; }
   .contact-layout   { grid-template-columns: 1fr; gap: 2.5rem; }
-  .lb-prev, .lb-next { display: none; }
+
+  /* Reposition prev/next to bottom corners instead of hiding them */
+  .lb-prev, .lb-next { top: auto; bottom: 1.5rem; transform: none; }
+  .lb-prev  { left: 1.5rem; }
+  .lb-next  { right: 1.5rem; }
+  .lb-prev:hover, .lb-next:hover { transform: scale(1.1); }
+
+  /* Prevent iOS auto-zoom on focused inputs (triggered when font-size < 16px) */
+  input, textarea, select { font-size: 16px !important; }
 }
 
 @media (max-width: 520px) {
   .masonry     { columns: 1; }
   .photo-grid  { grid-template-columns: 1fr; }
   section      { padding: 4rem 1.4rem; }
-  .filter-bar  { border-radius: var(--r-lg); }
+  .filter-bar  { border-radius: var(--r-lg); justify-content: flex-start; padding-left: .45rem; }
+}
+
+@media (max-width: 380px) {
+  section      { padding: 3rem 1rem; }
+  .container   { padding: 0 .8rem; }
 }

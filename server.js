@@ -24,8 +24,11 @@ app.use(express.static(path.join(__dirname, 'public')));
   try {
     const { error } = await supabase.storage.createBucket('photos', {
       public: true,
-      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
-      fileSizeLimit: 10 * 1024 * 1024,
+      allowedMimeTypes: [
+        'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+        'video/mp4', 'video/webm', 'video/quicktime',
+      ],
+      fileSizeLimit: 100 * 1024 * 1024,
     });
     if (error && !error.message.includes('already exists')) {
       console.warn('  Storage bucket warning:', error.message);

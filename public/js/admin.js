@@ -163,21 +163,34 @@ async function loadPhotos() {
 
   const grid = document.getElementById('photos-grid');
   grid.style.display = 'grid';
-  grid.innerHTML = photos.map(p => `
-    <div class="admin-photo-card" id="photo-card-${p.id}">
-      <img src="${escAdmin(p.image_url)}" alt="${escAdmin(p.title || p.original_name)}" loading="lazy"
-             onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />
-      <div class="admin-photo-info">
-        <div class="admin-photo-name" title="${escAdmin(p.title || p.original_name)}">${escAdmin(p.title || p.original_name || 'Untitled')}</div>
-        <div class="admin-photo-meta">${escAdmin(p.category)} &bull; ${formatDate(p.created_at)}</div>
-        ${p.featured ? '<span class="featured-badge">Featured</span>' : ''}
-        <div class="admin-photo-actions" style="margin-top:.5rem;">
-          <button class="btn btn-sm" onclick="openEditModal(${p.id})">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deletePhoto(${p.id})">Delete</button>
+  grid.innerHTML = photos.map(p => {
+    const isVideo  = p.media_type === 'video';
+    const thumbSrc = escAdmin(p.image_url);
+    const thumbAlt = escAdmin(p.title || p.original_name);
+    const imgMarkup = thumbSrc
+      ? `<img src="${thumbSrc}" alt="${thumbAlt}" loading="lazy"
+               onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />`
+      : `<div style="width:100%;height:140px;background:#111;display:flex;align-items:center;justify-content:center;">
+           <span style="color:rgba(235,235,245,.4);font-size:1.6rem;">&#9654;</span>
+         </div>`;
+    return `
+      <div class="admin-photo-card" id="photo-card-${p.id}">
+        <div style="position:relative;">
+          ${imgMarkup}
+          ${isVideo ? '<span class="video-badge">VIDEO</span>' : ''}
+        </div>
+        <div class="admin-photo-info">
+          <div class="admin-photo-name" title="${escAdmin(p.title || p.original_name)}">${escAdmin(p.title || p.original_name || 'Untitled')}</div>
+          <div class="admin-photo-meta">${escAdmin(p.category)} &bull; ${formatDate(p.created_at)}</div>
+          ${p.featured ? '<span class="featured-badge">Featured</span>' : ''}
+          <div class="admin-photo-actions" style="margin-top:.5rem;">
+            <button class="btn btn-sm" onclick="openEditModal(${p.id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deletePhoto(${p.id})">Delete</button>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ── PHOTOS — Upload ───────────────────────────────────────────────────────────
@@ -199,35 +212,91 @@ function previewFiles(files) {
   const container = document.getElementById('upload-preview');
   container.innerHTML = '';
   Array.from(files).forEach(f => {
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(f);
-    img.style.cssText = 'width:80px;height:80px;object-fit:cover;border:1px solid #2e2e2e;';
-    container.appendChild(img);
+    if (f.type.startsWith('video/')) {
+      // Video file — show a play icon placeholder instead of broken img
+      const div = document.createElement('div');
+      div.style.cssText = 'width:80px;height:80px;object-fit:cover;border:1px solid #2e2e2e;background:#111;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#aaa;border-radius:6px;';
+      div.textContent = '▶';
+      container.appendChild(div);
+    } else {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      img.style.cssText = 'width:80px;height:80px;object-fit:cover;border:1px solid #2e2e2e;border-radius:6px;';
+      container.appendChild(img);
+    }
   });
 }
 
-document.getElementById('upload-btn').addEventListener('click', async () => {
-  const files = uploadInput.files;
-  if (!files.length) { showAlert('upload-alert', 'Please select at least one image.', 'err'); return; }
+/** Wire up media-type radio group to show/hide video-specific fields */
+function initUploadForm() {
+  const videoUrlField = document.getElementById('video-url-field');
+  const thumbField    = document.getElementById('thumb-field');
+  const uploadHint    = document.getElementById('upload-hint');
+  const btn           = document.getElementById('upload-btn');
 
-  const btn = document.getElementById('upload-btn');
-  btn.disabled = true; btn.textContent = `Uploading ${files.length} file(s)…`;
+  function onTypeChange() {
+    const isVideo = document.getElementById('mt-video').checked;
+    videoUrlField.style.display = isVideo ? 'block' : 'none';
+    thumbField.style.display    = isVideo ? 'block' : 'none';
+    uploadHint.textContent = isVideo
+      ? 'MP4, WebM, MOV · Direct upload limited to ~4 MB on Vercel · Use YouTube/Vimeo URL above for larger videos'
+      : 'JPEG, PNG, WebP · Max 10 MB each · Multiple files allowed';
+    btn.textContent = isVideo ? 'Upload Video' : 'Upload Selected Photos';
+  }
+
+  document.querySelectorAll('input[name="media_type"]').forEach(r =>
+    r.addEventListener('change', onTypeChange)
+  );
+  onTypeChange(); // set initial state
+}
+
+document.getElementById('upload-btn').addEventListener('click', async () => {
+  const isVideo    = document.getElementById('mt-video').checked;
+  const files      = uploadInput.files;
+  const videoUrl   = document.getElementById('up-video-url')?.value.trim() || '';
+  const thumbInput = document.getElementById('thumb-input');
+  const btn        = document.getElementById('upload-btn');
+
+  // Validation
+  if (isVideo && !files.length && !videoUrl) {
+    showAlert('upload-alert', 'For video, either upload a file or enter a YouTube/Vimeo URL.', 'err'); return;
+  }
+  if (!isVideo && !files.length) {
+    showAlert('upload-alert', 'Please select at least one image.', 'err'); return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = files.length ? `Uploading ${files.length} file(s)…` : 'Saving video…';
 
   const form = new FormData();
-  Array.from(files).forEach(f => form.append('photos', f));
+  form.append('media_type', isVideo ? 'video' : 'photo');
+
+  if (isVideo && videoUrl && !files.length) {
+    // Embed URL path
+    form.append('video_url', videoUrl);
+    if (thumbInput?.files[0]) form.append('thumbnail', thumbInput.files[0]);
+  } else {
+    // File upload path
+    Array.from(files).forEach(f => form.append('photos', f));
+  }
+
   form.append('title',    document.getElementById('up-title').value);
   form.append('caption',  document.getElementById('up-caption').value);
   form.append('category', document.getElementById('up-category').value);
   form.append('featured', document.getElementById('up-featured').checked ? 'true' : 'false');
 
   const res = await authFetch('/api/admin/photos', { method: 'POST', body: form });
-  btn.disabled = false; btn.textContent = 'Upload Selected Photos';
+  btn.disabled = false;
+  btn.textContent = isVideo ? 'Upload Video' : 'Upload Selected Photos';
   if (!res) return;
 
   const data = await res.json();
   if (res.ok) {
-    showAlert('upload-alert', `${data.photos.length} photo(s) uploaded successfully.`, 'ok');
+    const count = data.photos?.length || 1;
+    showAlert('upload-alert', `${count} item(s) added successfully.`, 'ok');
     uploadInput.value = '';
+    if (thumbInput) thumbInput.value = '';
+    if (document.getElementById('up-video-url')) document.getElementById('up-video-url').value = '';
     document.getElementById('upload-preview').innerHTML = '';
     loadPhotos();
   } else {
@@ -237,7 +306,7 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
 
 // ── PHOTOS — Delete ───────────────────────────────────────────────────────────
 async function deletePhoto(id) {
-  if (!confirm('Delete this photo? This cannot be undone.')) return;
+  if (!confirm('Delete this item? This cannot be undone.')) return;
   const res = await authFetch(`/api/admin/photos/${id}`, { method: 'DELETE' });
   if (!res) return;
   if (res.ok) {
@@ -256,12 +325,33 @@ async function openEditModal(id) {
   const photo  = photos.find(p => p.id === id);
   if (!photo) return;
 
-  document.getElementById('modal-id').value          = photo.id;
-  document.getElementById('modal-preview').src       = photo.image_url || '';
-  document.getElementById('modal-title').value       = photo.title    || '';
-  document.getElementById('modal-caption').value     = photo.caption  || '';
-  document.getElementById('modal-category').value    = photo.category || 'uncategorized';
-  document.getElementById('modal-featured').checked  = !!photo.featured;
+  const isVideo = photo.media_type === 'video';
+
+  document.getElementById('modal-id').value         = photo.id;
+  document.getElementById('modal-title').value      = photo.title    || '';
+  document.getElementById('modal-caption').value    = photo.caption  || '';
+  document.getElementById('modal-category').value   = photo.category || 'uncategorized';
+  document.getElementById('modal-featured').checked = !!photo.featured;
+  document.getElementById('modal-head-title').textContent = isVideo ? 'Edit Video' : 'Edit Photo';
+
+  // Preview image
+  const preview = document.getElementById('modal-preview');
+  if (photo.image_url) {
+    preview.src           = photo.image_url;
+    preview.style.display = 'block';
+  } else {
+    preview.src           = '';
+    preview.style.display = 'none';
+  }
+
+  // Show/hide video URL field
+  const videoField = document.getElementById('modal-video-field');
+  if (isVideo) {
+    videoField.style.display = 'block';
+    document.getElementById('modal-video-url').value = photo.video_url || '';
+  } else {
+    videoField.style.display = 'none';
+  }
 
   document.getElementById('edit-modal').classList.add('open');
 }
@@ -277,16 +367,17 @@ document.getElementById('modal-save').addEventListener('click', async () => {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      title:    document.getElementById('modal-title').value,
-      caption:  document.getElementById('modal-caption').value,
-      category: document.getElementById('modal-category').value,
-      featured: document.getElementById('modal-featured').checked,
+      title:     document.getElementById('modal-title').value,
+      caption:   document.getElementById('modal-caption').value,
+      category:  document.getElementById('modal-category').value,
+      featured:  document.getElementById('modal-featured').checked,
+      video_url: document.getElementById('modal-video-url')?.value || undefined,
     }),
   });
   if (!res) return;
   const data = await res.json();
   if (res.ok) {
-    showAlert('modal-alert', 'Photo updated.', 'ok');
+    showAlert('modal-alert', 'Saved.', 'ok');
     loadPhotos();
     setTimeout(closeModal, 1200);
   } else {
@@ -481,6 +572,9 @@ function formatDate(iso) {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 (function init() {
+  // Wire up media-type toggle (runs regardless of auth state)
+  initUploadForm();
+
   const token = getToken();
   if (token) {
     // Verify token is still valid

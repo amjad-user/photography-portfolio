@@ -41,7 +41,7 @@
     <div class="container">
       <div class="section-header">
         <p class="section-label">Selected Work</p>
-        <h2 class="section-title">Featured Images</h2>
+        <h2 class="section-title">Featured Work</h2>
       </div>
       <div class="photo-grid" id="featured-grid">
         <div class="loading"><div class="spinner"></div></div>
@@ -58,7 +58,7 @@
     <button class="lb-prev"  id="lb-prev">&#8592;</button>
     <button class="lb-next"  id="lb-next">&#8594;</button>
     <div>
-      <img src="" alt="" id="lb-img" />
+      <div id="lb-media"></div>
       <div class="lightbox-caption">
         <strong id="lb-title"></strong>
         <span id="lb-caption"></span>
@@ -101,16 +101,20 @@
         grid.innerHTML = '<div class="empty-state"><p>No featured photos yet.</p></div>';
         return;
       }
-      grid.innerHTML = photos.map((p, i) => `
-        <div class="photo-item" data-index="${i}">
-          <img src="${escHtml(p.image_url)}" alt="${escHtml(p.title || p.original_name)}" loading="lazy"
-               onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />
-          <div class="photo-overlay">
-            ${p.title ? `<div class="photo-overlay-title">${escHtml(p.title)}</div>` : ''}
-            ${p.caption ? `<div class="photo-overlay-caption">${escHtml(p.caption)}</div>` : ''}
+      grid.innerHTML = photos.map((p, i) => {
+        const isVideo = p.media_type === 'video';
+        return `
+          <div class="photo-item${isVideo ? ' video-item' : ''}" data-index="${i}">
+            <img src="${escHtml(p.image_url)}" alt="${escHtml(p.title || p.original_name)}" loading="lazy"
+                 onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />
+            ${isVideo ? '<div class="play-overlay"><span class="play-btn">&#9654;</span></div>' : ''}
+            <div class="photo-overlay">
+              ${p.title   ? `<div class="photo-overlay-title">${escHtml(p.title)}</div>` : ''}
+              ${p.caption ? `<div class="photo-overlay-caption">${escHtml(p.caption)}</div>` : ''}
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       initLightbox(photos, grid);
     })();

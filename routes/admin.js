@@ -1,6 +1,6 @@
 /**
  * Admin API routes — all protected by JWT except /login.
- * Images are stored in Supabase Storage bucket "photos".
+ * Media (images + videos) stored in Supabase Storage bucket "photos".
  */
 const express    = require('express');
 const router     = express.Router();
@@ -11,16 +11,35 @@ const jwt        = require('jsonwebtoken');
 const supabase   = require('../supabase/client');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 
-// ── Multer — memory storage (buffer sent to Supabase, never written to disk) ──
+// ── Multer — memory storage, accepts images and videos ───────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    const ok = /\.(jpeg|jpg|png|gif|webp)$/i.test(file.originalname)
-            && /^image\//.test(file.mimetype);
-    cb(ok ? null : new Error('Only image files are allowed.'), ok);
+    const isImage = /\.(jpeg|jpg|png|gif|webp)$/i.test(file.originalname)
+                 && /^image\//.test(file.mimetype);
+    const isVideo = /\.(mp4|webm|mov)$/i.test(file.originalname)
+                 && /^video\//.test(file.mimetype);
+    const ok = isImage || isVideo;
+    cb(ok ? null : new Error('Only image or video files are allowed.'), ok);
   },
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB (Vercel caps at ~4.5 MB in practice)
 });
+
+// ── Helper: normalise YouTube/Vimeo watch URLs → embed URLs ──────────────────
+function normaliseVideoUrl(url) {
+  if (!url) return null;
+  // Already an embed URL — pass through
+  if (/youtube\.com\/embed\/|player\.vimeo\.com\/video\//.test(url)) return url;
+  // youtube.com/watch?v=ID  or  youtu.be/ID
+  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+  // vimeo.com/ID  (handles vimeo.com/channels/foo/ID too)
+  const vm = url.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+  if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
+  // Direct URL (Supabase Storage or other) — allow as-is
+  if (/^https?:\/\//.test(url)) return url;
+  return null;
+}
 
 // ── Helper: upload a buffer to Supabase Storage, return public URL ────────────
 async function uploadToStorage(buffer, originalname, mimetype, folder = 'photos') {
@@ -113,47 +132,86 @@ router.get('/photos', authenticateToken, async (_req, res) => {
   }
 });
 
-// POST /photos — upload one or more images to Supabase Storage
-router.post('/photos', authenticateToken, upload.array('photos', 20), async (req, res) => {
-  if (!req.files?.length)
-    return res.status(400).json({ error: 'No files uploaded.' });
+// POST /photos — upload images/videos or save an embed URL (YouTube/Vimeo)
+router.post('/photos', authenticateToken,
+  upload.fields([{ name: 'photos', maxCount: 20 }, { name: 'thumbnail', maxCount: 1 }]),
+  async (req, res) => {
+    const {
+      title = '', caption = '', category = 'uncategorized',
+      featured = 'false', media_type = 'photo', video_url = '',
+    } = req.body;
 
-  const { title = '', caption = '', category = 'uncategorized', featured = 'false' } = req.body;
-  console.log(`[photos:upload] Received ${req.files.length} file(s)`);
+    const photoFiles     = req.files?.photos     || [];
+    const thumbnailFiles = req.files?.thumbnail  || [];
 
-  try {
-    const rows = [];
+    console.log(`[photos:upload] media_type=${media_type} files=${photoFiles.length} video_url=${video_url ? 'yes' : 'no'}`);
 
-    for (const file of req.files) {
-      const { filename, publicUrl } = await uploadToStorage(
-        file.buffer, file.originalname, file.mimetype, 'photos'
-      );
-      rows.push({
-        filename,
-        original_name: file.originalname,
-        image_url:     publicUrl,
-        title,
-        caption,
-        category,
-        featured: featured === 'true',
-      });
+    try {
+      // ── Path A: embed URL only (YouTube / Vimeo — no binary upload) ──────
+      if (media_type === 'video' && !photoFiles.length && video_url) {
+        const normalised = normaliseVideoUrl(video_url);
+        if (!normalised) return res.status(400).json({ error: 'Invalid YouTube or Vimeo URL.' });
+
+        let thumbUrl = '';
+        if (thumbnailFiles.length) {
+          const { publicUrl } = await uploadToStorage(
+            thumbnailFiles[0].buffer, thumbnailFiles[0].originalname,
+            thumbnailFiles[0].mimetype, 'photos'
+          );
+          thumbUrl = publicUrl;
+        }
+
+        const { data, error } = await supabase.from('photos').insert([{
+          filename:      '',
+          original_name: title || 'Video',
+          image_url:     thumbUrl,
+          video_url:     normalised,
+          media_type:    'video',
+          title, caption, category,
+          featured: featured === 'true',
+        }]).select('id, video_url, image_url');
+
+        if (error) throw error;
+        console.log(`[photos:upload] Inserted embed video row id=${data[0]?.id}`);
+        return res.json({ success: true, photos: data });
+      }
+
+      // ── Path B: file upload (images or small video files) ────────────────
+      if (!photoFiles.length) return res.status(400).json({ error: 'No files uploaded.' });
+
+      const rows = [];
+      for (const file of photoFiles) {
+        const isVideo = /^video\//.test(file.mimetype);
+        const { filename, publicUrl } = await uploadToStorage(
+          file.buffer, file.originalname, file.mimetype, 'photos'
+        );
+        rows.push({
+          filename,
+          original_name: file.originalname,
+          image_url:     isVideo ? '' : publicUrl,
+          video_url:     isVideo ? publicUrl : '',
+          media_type:    isVideo ? 'video' : 'photo',
+          title, caption, category,
+          featured: featured === 'true',
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('photos').insert(rows).select('id, filename, image_url, video_url, media_type');
+
+      if (error) {
+        console.error('[photos:upload] DB insert error:', error.message);
+        throw error;
+      }
+
+      console.log(`[photos:upload] Inserted ${data.length} row(s)`);
+      res.json({ success: true, photos: data });
+    } catch (err) {
+      console.error('[photos:upload] Error:', err.message);
+      res.status(500).json({ error: 'Upload failed.', detail: err.message });
     }
-
-    const { data, error } = await supabase
-      .from('photos').insert(rows).select('id, filename, image_url');
-
-    if (error) {
-      console.error('[photos:upload] DB insert error:', error.message);
-      throw error;
-    }
-
-    console.log(`[photos:upload] Inserted ${data.length} row(s)`);
-    res.json({ success: true, photos: data });
-  } catch (err) {
-    console.error('[photos:upload] Error:', err.message);
-    res.status(500).json({ error: 'Upload failed.', detail: err.message });
   }
-});
+);
 
 router.put('/photos/:id', authenticateToken, async (req, res) => {
   try {
@@ -161,16 +219,21 @@ router.put('/photos/:id', authenticateToken, async (req, res) => {
       .from('photos').select('*').eq('id', req.params.id).single();
     if (fetchErr || !photo) return res.status(404).json({ error: 'Photo not found.' });
 
-    const { title, caption, category, featured } = req.body;
+    const { title, caption, category, featured, video_url } = req.body;
+    const update = {
+      title:    title    ?? photo.title,
+      caption:  caption  ?? photo.caption,
+      category: category ?? photo.category,
+      featured: featured !== undefined ? !!featured : photo.featured,
+    };
+
+    // Only update video_url for video rows; normalise watch URLs → embed URLs
+    if (photo.media_type === 'video' && video_url !== undefined) {
+      update.video_url = normaliseVideoUrl(video_url) || video_url;
+    }
+
     const { error } = await supabase
-      .from('photos')
-      .update({
-        title:    title    ?? photo.title,
-        caption:  caption  ?? photo.caption,
-        category: category ?? photo.category,
-        featured: featured !== undefined ? !!featured : photo.featured,
-      })
-      .eq('id', req.params.id);
+      .from('photos').update(update).eq('id', req.params.id);
 
     if (error) throw error;
     res.json({ success: true });

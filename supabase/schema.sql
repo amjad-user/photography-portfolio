@@ -26,7 +26,11 @@ CREATE TABLE IF NOT EXISTS photos (
 );
 
 -- Add image_url to existing installations that ran the old schema
-ALTER TABLE photos ADD COLUMN IF NOT EXISTS image_url text default '';
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS image_url   text default '';
+
+-- Add video support to existing installations
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS media_type  text default 'photo';
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS video_url   text default '';
 
 CREATE TABLE IF NOT EXISTS settings (
   key   text primary key,
@@ -45,14 +49,14 @@ CREATE TABLE IF NOT EXISTS messages (
 -- ── Default site settings ─────────────────────────────────────────────────────
 
 INSERT INTO settings (key, value) VALUES
-  ('site_name',        'Alex Morgan Photography'),
+  ('site_name',        'Photography Portfolio'),
   ('hero_tagline',     'Capturing moments that last a lifetime'),
-  ('hero_subtitle',    'Professional photographer based in New York City'),
+  ('hero_subtitle',    'Professional photographer'),
   ('hero_image',       ''),
-  ('about_bio',        E'I''m a professional photographer with over 10 years of experience.\nFrom intimate portraits to sweeping landscapes, I bring a unique artistic vision to every shoot.'),
+  ('about_bio',        E'Welcome to my portfolio.\nI capture moments that tell stories.'),
   ('about_image',      ''),
-  ('contact_email',    'hello@alexmorganphoto.com'),
-  ('contact_phone',    '+1 (555) 123-4567'),
+  ('contact_email',    ''),
+  ('contact_phone',    ''),
   ('social_instagram', ''),
   ('social_facebook',  ''),
   ('social_twitter',   '')

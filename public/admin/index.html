@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin — Photography</title>
+  <title>Admin Panel</title>
   <link rel="stylesheet" href="/css/admin.css" />
 </head>
 <body>
@@ -13,14 +13,14 @@
 ═════════════════════════════════════════════════════════════════════════════ -->
 <div id="login-screen">
   <div class="login-box">
-    <p class="login-logo">Photography &mdash; Admin</p>
+    <p class="login-logo">Portfolio &mdash; Admin</p>
     <h1>Sign In</h1>
     <p>Enter your credentials to access the dashboard.</p>
     <div class="login-error" id="login-error"></div>
     <form id="login-form">
       <div class="field">
         <label for="l-email">Email Address</label>
-        <input type="email" id="l-email" placeholder="admin@example.com" required autocomplete="username" />
+        <input type="email" id="l-email" placeholder="your@email.com" required autocomplete="username" />
       </div>
       <div class="field">
         <label for="l-pass">Password</label>
@@ -46,7 +46,7 @@
         &#9632; &nbsp;Dashboard
       </a>
       <a href="#" data-section="photos">
-        &#9724; &nbsp;Photos
+        &#9724; &nbsp;Media
       </a>
       <a href="#" data-section="content">
         &#9998; &nbsp;Content
@@ -74,7 +74,7 @@
     <section id="sec-dashboard" class="admin-section">
       <h2 class="page-title">Dashboard</h2>
       <div class="stats-grid" id="stats-grid">
-        <div class="stat-card"><div class="stat-value" id="st-photos">—</div><div class="stat-label">Total Photos</div></div>
+        <div class="stat-card"><div class="stat-value" id="st-photos">—</div><div class="stat-label">Total Items</div></div>
         <div class="stat-card highlight"><div class="stat-value" id="st-featured">—</div><div class="stat-label">Featured</div></div>
         <div class="stat-card"><div class="stat-value" id="st-cats">—</div><div class="stat-label">Categories</div></div>
         <div class="stat-card"><div class="stat-value" id="st-msgs">—</div><div class="stat-label">Messages</div></div>
@@ -83,7 +83,7 @@
       <div class="panel">
         <p class="panel-title">Quick Links</p>
         <div class="btn-group" style="margin-top:0;">
-          <button class="btn" onclick="switchSection('photos')">Manage Photos</button>
+          <button class="btn" onclick="switchSection('photos')">Manage Media</button>
           <button class="btn" onclick="switchSection('content')">Edit Content</button>
           <button class="btn" onclick="switchSection('messages')">View Messages</button>
           <a href="/" target="_blank" class="btn">View Public Site &#8599;</a>
@@ -93,20 +93,53 @@
 
     <!-- ── PHOTOS ──────────────────────────────────────────────────────────── -->
     <section id="sec-photos" class="admin-section" style="display:none">
-      <h2 class="page-title">Photo Management</h2>
+      <h2 class="page-title">Media Management</h2>
 
       <!-- Upload panel -->
       <div class="panel">
-        <p class="panel-title">Upload Photos</p>
+        <p class="panel-title">Add Media</p>
+
+        <!-- Media type selector -->
+        <div class="field">
+          <label>Media Type</label>
+          <div class="radio-group" id="media-type-group">
+            <label class="radio-label">
+              <input type="radio" name="media_type" id="mt-photo" value="photo" checked />
+              Photo
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="media_type" id="mt-video" value="video" />
+              Video
+            </label>
+          </div>
+        </div>
+
+        <!-- File upload zone -->
         <div class="upload-zone" id="upload-zone">
-          <input type="file" id="upload-input" multiple accept="image/*" />
-          <p>Drag &amp; drop images here, or <strong>click to browse</strong></p>
-          <p style="margin-top:.4rem;font-size:.78rem;">JPEG, PNG, WebP &bull; Max 10 MB each &bull; Multiple files allowed</p>
+          <input type="file" id="upload-input" multiple accept="image/*,video/mp4,video/webm,video/quicktime" />
+          <p>Drag &amp; drop files here, or <strong>click to browse</strong></p>
+          <p id="upload-hint" style="margin-top:.4rem;font-size:.78rem;">JPEG, PNG, WebP &bull; Max 10 MB each &bull; Multiple files allowed</p>
+        </div>
+
+        <!-- Video URL field (shown only when Video is selected) -->
+        <div class="field" id="video-url-field" style="display:none;">
+          <label>YouTube / Vimeo URL <span style="font-weight:normal;text-transform:none;letter-spacing:0;">(or upload a small file above)</span></label>
+          <input type="url" id="up-video-url" placeholder="https://youtube.com/watch?v=… or https://vimeo.com/…" />
+          <p class="field-hint">Paste the watch page URL — it will be converted automatically. For videos &gt; ~4 MB on Vercel, use YouTube or Vimeo instead of direct upload.</p>
+        </div>
+
+        <!-- Thumbnail for embed videos (shown only when Video is selected) -->
+        <div class="field" id="thumb-field" style="display:none;">
+          <label>Thumbnail Image <span style="font-weight:normal;text-transform:none;letter-spacing:0;color:var(--muted);">(optional — shown in gallery grid)</span></label>
+          <div class="upload-zone" style="padding:1rem;" id="thumb-zone">
+            <input type="file" id="thumb-input" accept="image/*" />
+            <p>Click to upload a poster / thumbnail for this video</p>
+          </div>
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label>Title (applied to all uploaded photos)</label>
+            <label>Title</label>
             <input type="text" id="up-title" placeholder="Optional title" />
           </div>
           <div class="field">
@@ -140,12 +173,12 @@
         <div id="upload-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem;"></div>
       </div>
 
-      <!-- Existing photos -->
+      <!-- Existing media -->
       <div class="panel">
-        <p class="panel-title">All Photos</p>
+        <p class="panel-title">All Media</p>
         <div id="photos-loading" class="loading"><div class="spinner"></div></div>
         <div class="admin-photo-grid" id="photos-grid" style="display:none"></div>
-        <div class="empty-state" id="photos-empty" style="display:none"><p>No photos uploaded yet.</p></div>
+        <div class="empty-state" id="photos-empty" style="display:none"><p>No media uploaded yet.</p></div>
       </div>
     </section>
 
@@ -159,7 +192,7 @@
         <p class="panel-title">Homepage</p>
         <div class="field">
           <label>Site / Photographer Name</label>
-          <input type="text" id="c-site-name" placeholder="Alex Morgan Photography" />
+          <input type="text" id="c-site-name" placeholder="Your Name / Studio Name" />
         </div>
         <div class="field">
           <label>Hero Tagline</label>
@@ -202,7 +235,7 @@
         <div class="field-row">
           <div class="field">
             <label>Email</label>
-            <input type="email" id="c-contact-email" placeholder="hello@example.com" />
+            <input type="email" id="c-contact-email" placeholder="your@email.com" />
           </div>
           <div class="field">
             <label>Phone</label>
@@ -267,10 +300,10 @@
 <div class="modal-overlay" id="edit-modal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>Edit Photo</h3>
+      <h3 id="modal-head-title">Edit Photo</h3>
       <button class="modal-close" id="modal-close">&#x2715;</button>
     </div>
-    <img id="modal-preview" src="" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:1.2rem;" />
+    <img id="modal-preview" src="" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:1.2rem;border-radius:var(--r-sm);" />
     <input type="hidden" id="modal-id" />
     <div class="field">
       <label>Title</label>
@@ -296,6 +329,12 @@
       <input type="checkbox" id="modal-featured" />
       Featured (show on homepage)
     </label>
+    <!-- Video URL field — shown only for video items -->
+    <div class="field" id="modal-video-field" style="display:none;">
+      <label>Video URL</label>
+      <input type="url" id="modal-video-url" placeholder="https://youtube.com/watch?v=… or https://vimeo.com/…" />
+      <p class="field-hint">YouTube / Vimeo embed URL or Supabase Storage URL. Paste a watch page URL and it will be normalised on save.</p>
+    </div>
     <div class="btn-group" style="margin-top:0;">
       <button class="btn btn-primary" id="modal-save">Save Changes</button>
       <button class="btn" id="modal-cancel">Cancel</button>

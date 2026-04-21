@@ -296,6 +296,17 @@ button { font-family: var(--sans); cursor: pointer; }
   padding: .15rem .52rem; margin-top: .3rem;
   border-radius: 6px;
 }
+.video-badge {
+  position: absolute; top: .4rem; left: .4rem;
+  font-size: .58rem; letter-spacing: .12em; text-transform: uppercase;
+  color: #fff;
+  background: rgba(0,0,0,0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.18);
+  padding: .12rem .42rem;
+  border-radius: 5px;
+}
 
 /* ── Edit modal ──────────────────────────────────────────────────────────────── */
 .modal-overlay {
@@ -400,6 +411,32 @@ button { font-family: var(--sans); cursor: pointer; }
 .empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Radio group (media type selector) ───────────────────────────────────────── */
+.radio-group {
+  display: flex; gap: .6rem; flex-wrap: wrap;
+}
+.radio-label {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .5rem .9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer; font-size: .85rem;
+  transition: background var(--ease), border-color var(--ease);
+  user-select: none;
+}
+.radio-label:has(input:checked) {
+  background: rgba(212,168,83,0.18);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.radio-label input { display: none; }
+
+/* Field hint text */
+.field-hint {
+  font-size: .74rem; color: var(--muted);
+  margin-top: .3rem; line-height: 1.45;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar              { transform: translateX(-100%); }
@@ -408,8 +445,12 @@ button { font-family: var(--sans); cursor: pointer; }
   .sidebar-toggle       { display: flex; }
   .stats-grid           { grid-template-columns: 1fr 1fr; }
   .field-row            { grid-template-columns: 1fr; }
+
+  /* Prevent iOS auto-zoom on focused inputs */
+  input, textarea, select { font-size: 16px !important; }
 }
 @media (max-width: 480px) {
   .admin-photo-grid     { grid-template-columns: repeat(2, 1fr); }
   .stats-grid           { grid-template-columns: 1fr; }
+  .upload-zone          { padding: 1.4rem; }
 }
