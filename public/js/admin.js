@@ -553,10 +553,14 @@ document.getElementById('pw-btn').addEventListener('click', async () => {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-/** Admin card thumbnail — mirrors mediaThumb() from main.js */
+/**
+ * Admin card thumbnail. Same strategy as mediaThumb() in main.js:
+ * never uses <video> for thumbnails — iOS Safari renders it as a black box.
+ */
 function adminMediaThumb(p) {
   const s = 'width:100%;height:140px;object-fit:cover;display:block;';
 
+  // 1. Uploaded thumbnail
   if (p.image_url) {
     return `<img src="${escAdmin(p.image_url)}" alt="" loading="lazy"
                  style="${s}"
@@ -564,21 +568,16 @@ function adminMediaThumb(p) {
   }
 
   if (p.media_type === 'video' && p.video_url) {
-    // YouTube CDN thumbnail (no API key required)
+    // 2. YouTube CDN thumbnail
     const yt = p.video_url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/);
     if (yt) {
       return `<img src="https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg" alt="" loading="lazy"
                    style="${s}"
                    onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />`;
     }
-    // Direct video file — browser shows first frame
-    if (/\.(mp4|webm|mov)(\?|$)/i.test(p.video_url)) {
-      return `<video src="${escAdmin(p.video_url)}" preload="metadata" muted playsinline
-                     style="${s}pointer-events:none;"></video>`;
-    }
   }
 
-  // Vimeo or unknown — dark placeholder
+  // 3. No thumbnail — dark placeholder with play icon
   return `<div style="${s}background:#111;display:flex;align-items:center;justify-content:center;">
             <span style="color:rgba(235,235,245,.3);font-size:1.4rem;">&#9654;</span>
           </div>`;
