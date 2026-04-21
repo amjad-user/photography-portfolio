@@ -201,16 +201,79 @@ uploadZone.addEventListener('drop', e => {
 });
 uploadInput.addEventListener('change', () => previewFiles(uploadInput.files));
 
+// Stores auto-extracted thumbnail blobs: File → Blob (populated asynchronously)
+const pendingThumbnails = new Map();
+
+/**
+ * Extracts a single frame from a video File using a hidden <video> + <canvas>.
+ * Seeks to 0.5 s (or 10% of duration if shorter). Returns a JPEG Blob, or null
+ * if extraction fails (e.g. iOS Safari restrictions, decode error, timeout).
+ */
+function extractVideoThumbnail(file) {
+  return new Promise(resolve => {
+    const objectUrl = URL.createObjectURL(file);
+    const video     = document.createElement('video');
+    video.muted       = true;
+    video.playsInline = true;
+    video.preload     = 'metadata';
+
+    const finish = blob => { URL.revokeObjectURL(objectUrl); resolve(blob); };
+    const fail   = ()   => finish(null);
+
+    // Give up after 8 seconds — handles iOS stalls gracefully
+    const timer = setTimeout(fail, 8000);
+
+    video.addEventListener('loadedmetadata', () => {
+      video.currentTime = Math.min(0.5, (video.duration || 1) * 0.1);
+    });
+
+    video.addEventListener('seeked', () => {
+      clearTimeout(timer);
+      try {
+        const canvas  = document.createElement('canvas');
+        canvas.width  = video.videoWidth  || 640;
+        canvas.height = video.videoHeight || 360;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => finish(blob), 'image/jpeg', 0.85);
+      } catch { fail(); }
+    });
+
+    video.addEventListener('error', () => { clearTimeout(timer); fail(); });
+    video.src = objectUrl;
+  });
+}
+
 function previewFiles(files) {
   const container = document.getElementById('upload-preview');
   container.innerHTML = '';
+  pendingThumbnails.clear();
+
   Array.from(files).forEach(f => {
     if (f.type.startsWith('video/')) {
-      // Video file — show a play icon placeholder instead of broken img
-      const div = document.createElement('div');
-      div.style.cssText = 'width:80px;height:80px;object-fit:cover;border:1px solid #2e2e2e;background:#111;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#aaa;border-radius:6px;';
-      div.textContent = '▶';
-      container.appendChild(div);
+      // Show a placeholder while extraction is in progress
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'width:80px;height:80px;border:1px solid #2e2e2e;background:#111;display:flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden;position:relative;flex-shrink:0;';
+      wrap.innerHTML = '<span style="color:#777;font-size:1.1rem;">⏳</span>';
+      container.appendChild(wrap);
+
+      extractVideoThumbnail(f).then(blob => {
+        if (blob) {
+          pendingThumbnails.set(f, blob);
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(blob);
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          wrap.innerHTML = '';
+          wrap.appendChild(img);
+          // Small play icon overlay so it's clearly a video
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);pointer-events:none;';
+          overlay.innerHTML = '<span style="color:#fff;font-size:1rem;">▶</span>';
+          wrap.appendChild(overlay);
+        } else {
+          // Extraction failed (e.g. iOS) — show static play icon
+          wrap.innerHTML = '<span style="color:#aaa;font-size:1.4rem;">▶</span>';
+        }
+      });
     } else {
       const img = document.createElement('img');
       img.src = URL.createObjectURL(f);
@@ -269,8 +332,14 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
     form.append('video_url', videoUrl);
     if (thumbInput?.files[0]) form.append('thumbnail', thumbInput.files[0]);
   } else {
-    // File upload path
-    Array.from(files).forEach(f => form.append('photos', f));
+    // File upload path — append each file and its auto-extracted thumbnail (if any)
+    Array.from(files).forEach((f, i) => {
+      form.append('photos', f);
+      if (f.type.startsWith('video/')) {
+        const thumb = pendingThumbnails.get(f);
+        if (thumb) form.append(`thumbnail_${i}`, thumb, `thumb_${i}.jpg`);
+      }
+    });
   }
 
   form.append('title',    document.getElementById('up-title').value);
@@ -291,6 +360,7 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
     if (thumbInput) thumbInput.value = '';
     if (document.getElementById('up-video-url')) document.getElementById('up-video-url').value = '';
     document.getElementById('upload-preview').innerHTML = '';
+    pendingThumbnails.clear();
     loadPhotos();
   } else {
     showAlert('upload-alert', data.error || 'Upload failed.', 'err');

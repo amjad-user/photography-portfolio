@@ -134,7 +134,12 @@ router.get('/photos', authenticateToken, async (_req, res) => {
 
 // POST /photos — upload images/videos or save an embed URL (YouTube/Vimeo)
 router.post('/photos', authenticateToken,
-  upload.fields([{ name: 'photos', maxCount: 20 }, { name: 'thumbnail', maxCount: 1 }]),
+  upload.fields([
+    { name: 'photos',    maxCount: 20 },
+    { name: 'thumbnail', maxCount: 1  },  // embed-URL manual thumbnail (existing)
+    // Auto-extracted client-side thumbnails, one per video file slot (thumbnail_0 … thumbnail_19)
+    ...Array.from({ length: 20 }, (_, i) => ({ name: `thumbnail_${i}`, maxCount: 1 })),
+  ]),
   async (req, res) => {
     const {
       title = '', caption = '', category = 'uncategorized',
@@ -180,15 +185,31 @@ router.post('/photos', authenticateToken,
       if (!photoFiles.length) return res.status(400).json({ error: 'No files uploaded.' });
 
       const rows = [];
-      for (const file of photoFiles) {
+      for (let i = 0; i < photoFiles.length; i++) {
+        const file    = photoFiles[i];
         const isVideo = /^video\//.test(file.mimetype);
         const { filename, publicUrl } = await uploadToStorage(
           file.buffer, file.originalname, file.mimetype, 'photos'
         );
+
+        // For video files, upload the auto-extracted thumbnail (thumbnail_i) if provided
+        let thumbUrl = '';
+        if (isVideo) {
+          const thumbFiles = req.files[`thumbnail_${i}`];
+          if (thumbFiles?.length) {
+            const tf = thumbFiles[0];
+            const { publicUrl: tUrl } = await uploadToStorage(
+              tf.buffer, tf.originalname, tf.mimetype, 'photos'
+            );
+            thumbUrl = tUrl;
+            console.log(`[photos:upload] Saved auto-thumbnail for file[${i}]: ${tUrl}`);
+          }
+        }
+
         rows.push({
           filename,
           original_name: file.originalname,
-          image_url:     isVideo ? '' : publicUrl,
+          image_url:     isVideo ? thumbUrl : publicUrl,
           video_url:     isVideo ? publicUrl : '',
           media_type:    isVideo ? 'video' : 'photo',
           title, caption, category,
