@@ -47,12 +47,16 @@ function showAlert(id, msg, type = 'ok') {
  * dialogs called inside async functions, silently returning false.
  */
 function showConfirm(message) {
-  return new Promise(resolve => {
-    const modal     = document.getElementById('confirm-modal');
-    const msgEl     = document.getElementById('confirm-message');
-    const okBtn     = document.getElementById('confirm-ok');
-    const cancelBtn = document.getElementById('confirm-cancel');
+  const modal     = document.getElementById('confirm-modal');
+  const msgEl     = document.getElementById('confirm-message');
+  const okBtn     = document.getElementById('confirm-ok');
+  const cancelBtn = document.getElementById('confirm-cancel');
 
+  if (!modal || !msgEl || !okBtn || !cancelBtn) {
+    return Promise.resolve(window.confirm(message));
+  }
+
+  return new Promise(resolve => {
     msgEl.textContent = message;
     modal.classList.add('open');
 
@@ -241,7 +245,10 @@ uploadZone.addEventListener('drop', e => {
 uploadInput.addEventListener('change', () => previewFiles(uploadInput.files));
 
 // Stores auto-extracted thumbnail blobs: File → Blob (populated asynchronously)
-const pendingThumbnails = new Map();
+const pendingThumbnails  = new Map();
+// Stores the extraction Promise for each video file so the upload handler can
+// await completion before reading pendingThumbnails.
+const pendingExtractions = new Map();
 
 /**
  * Extracts a single frame from a video File using a hidden <video> + <canvas>.
@@ -286,6 +293,7 @@ function previewFiles(files) {
   const container = document.getElementById('upload-preview');
   container.innerHTML = '';
   pendingThumbnails.clear();
+  pendingExtractions.clear();
 
   Array.from(files).forEach(f => {
     if (f.type.startsWith('video/')) {
@@ -295,7 +303,7 @@ function previewFiles(files) {
       wrap.innerHTML = '<span style="color:#777;font-size:1.1rem;">⏳</span>';
       container.appendChild(wrap);
 
-      extractVideoThumbnail(f).then(blob => {
+      const extraction = extractVideoThumbnail(f).then(blob => {
         if (blob) {
           pendingThumbnails.set(f, blob);
           const img = document.createElement('img');
@@ -313,6 +321,7 @@ function previewFiles(files) {
           wrap.innerHTML = '<span style="color:#aaa;font-size:1.4rem;">▶</span>';
         }
       });
+      pendingExtractions.set(f, extraction);
     } else {
       const img = document.createElement('img');
       img.src = URL.createObjectURL(f);
@@ -371,7 +380,13 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
     form.append('video_url', videoUrl);
     if (thumbInput?.files[0]) form.append('thumbnail', thumbInput.files[0]);
   } else {
-    // File upload path — append each file and its auto-extracted thumbnail (if any)
+    // File upload path — wait for any in-progress thumbnail extractions first
+    const videoFiles = Array.from(files).filter(f => f.type.startsWith('video/'));
+    if (videoFiles.length) {
+      const extractions = videoFiles.map(f => pendingExtractions.get(f)).filter(Boolean);
+      if (extractions.length) await Promise.all(extractions);
+    }
+
     Array.from(files).forEach((f, i) => {
       form.append('photos', f);
       if (f.type.startsWith('video/')) {
@@ -682,6 +697,16 @@ document.getElementById('pw-btn').addEventListener('click', async () => {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
+// Extracts a YouTube video ID from any YouTube URL format
+// (embed, watch?v=, youtu.be short link). Returns null for non-YouTube URLs.
+function youTubeId(url) {
+  if (!url) return null;
+  const m = url.match(
+    /(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
+}
+
 /**
  * Admin card thumbnail. Same strategy as mediaThumb() in main.js:
  * never uses <video> for thumbnails — iOS Safari renders it as a black box.
@@ -697,10 +722,10 @@ function adminMediaThumb(p) {
   }
 
   if (p.media_type === 'video' && p.video_url) {
-    // 2. YouTube CDN thumbnail
-    const yt = p.video_url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/);
-    if (yt) {
-      return `<img src="https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg" alt="" loading="lazy"
+    // 2. YouTube CDN thumbnail — matches embed, watch, and youtu.be URLs
+    const ytId = youTubeId(p.video_url);
+    if (ytId) {
+      return `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy"
                    style="${s}"
                    onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />`;
     }

@@ -25,6 +25,16 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB (Vercel caps at ~4.5 MB in practice)
 });
 
+// ── Helper: extract Supabase Storage path from a public URL ──────────────────
+// e.g. "https://xxx.supabase.co/storage/v1/object/public/photos/photos/file.jpg"
+//      → "photos/file.jpg"
+function storagePathFromUrl(url, bucket) {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const idx    = url.indexOf(marker);
+  return idx >= 0 ? url.slice(idx + marker.length) : null;
+}
+
 // ── Helper: normalise YouTube/Vimeo watch URLs → embed URLs ──────────────────
 function normaliseVideoUrl(url) {
   if (!url) return null;
@@ -129,6 +139,18 @@ router.get('/photos', authenticateToken, async (_req, res) => {
   } catch (err) {
     console.error('[photos:get] Error:', err.message);
     res.status(500).json({ error: 'Failed to load photos.' });
+  }
+});
+
+router.get('/photos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('photos').select('*').eq('id', req.params.id).single();
+    if (error || !data) return res.status(404).json({ error: 'Photo not found.' });
+    res.json(data);
+  } catch (err) {
+    console.error('[photos:get-one] Error:', err.message);
+    res.status(500).json({ error: 'Failed to load photo.' });
   }
 });
 
@@ -267,24 +289,45 @@ router.put('/photos/:id', authenticateToken, async (req, res) => {
 router.delete('/photos/:id', authenticateToken, async (req, res) => {
   try {
     const { data: photo, error: fetchErr } = await supabase
-      .from('photos').select('filename, image_url').eq('id', req.params.id).single();
-    if (fetchErr || !photo) return res.status(404).json({ error: 'Photo not found.' });
+      .from('photos').select('filename, image_url, media_type').eq('id', req.params.id).single();
 
-    // Remove from Supabase Storage
+    if (fetchErr || !photo) {
+      console.warn('[photos:delete] Not found — id:', req.params.id, fetchErr?.message);
+      return res.status(404).json({ error: 'Photo not found.' });
+    }
+
+    // Build the list of Supabase Storage paths to remove.
+    // For direct-upload videos with an auto-generated thumbnail, both the video
+    // file and the thumbnail JPEG are stored in the bucket and must be cleaned up.
+    const pathsToRemove = [];
     if (photo.filename) {
+      pathsToRemove.push(photo.filename);
+    }
+    // image_url for uploaded thumbnails is a full Supabase Storage public URL —
+    // extract its bucket-relative path and add it (if different from filename).
+    const thumbPath = storagePathFromUrl(photo.image_url, 'photos');
+    if (thumbPath && thumbPath !== photo.filename) {
+      pathsToRemove.push(thumbPath);
+    }
+
+    if (pathsToRemove.length) {
+      console.log('[photos:delete] Removing from storage:', pathsToRemove);
       const { error: storageErr } = await supabase.storage
-        .from('photos')
-        .remove([photo.filename]);
-      if (storageErr) console.warn('[photos:delete] Storage removal warning:', storageErr.message);
-      else             console.log('[photos:delete] Removed from storage:', photo.filename);
+        .from('photos').remove(pathsToRemove);
+      if (storageErr) {
+        // Log but continue — a storage error should not block the DB row from being deleted.
+        console.warn('[photos:delete] Storage removal warning:', storageErr.message);
+      }
     }
 
     const { error } = await supabase.from('photos').delete().eq('id', req.params.id);
     if (error) throw error;
+
+    console.log('[photos:delete] Deleted id:', req.params.id);
     res.json({ success: true });
   } catch (err) {
     console.error('[photos:delete] Error:', err.message);
-    res.status(500).json({ error: 'Delete failed.' });
+    res.status(500).json({ error: 'Delete failed.', detail: err.message });
   }
 });
 

@@ -35,12 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
  * box until the user explicitly taps play. Static images are the only reliable
  * cross-browser thumbnail strategy.
  */
+// Extracts a YouTube video ID from any YouTube URL format:
+//   youtube.com/embed/ID, youtube.com/watch?v=ID, youtu.be/ID
+function youTubeId(url) {
+  if (!url) return null;
+  const m = url.match(
+    /(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
+}
+
 function mediaThumb(p) {
   // No height:100% — let the CSS rule (.photo-item img { height:280px }) take effect.
   // Inline height:100% would win over class rules and collapse inside an auto-height parent.
   const imgStyle = 'width:100%;object-fit:cover;display:block;';
 
-  // 1. Uploaded thumbnail / poster image — best result, works everywhere
+  // 1. Uploaded / auto-generated thumbnail — works everywhere including iOS
   if (p.image_url) {
     return `<img src="${escHtml(p.image_url)}" alt="" loading="lazy"
                  style="${imgStyle}"
@@ -48,10 +58,10 @@ function mediaThumb(p) {
   }
 
   if (p.media_type === 'video' && p.video_url) {
-    // 2. YouTube embed → free CDN thumbnail, no API key needed
-    const yt = p.video_url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/);
-    if (yt) {
-      return `<img src="https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg" alt="" loading="lazy"
+    // 2. YouTube CDN thumbnail — works for embed URLs AND watch/short URLs
+    const ytId = youTubeId(p.video_url);
+    if (ytId) {
+      return `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy"
                    style="${imgStyle}"
                    onerror="this.style.background='#1a1a1a';this.removeAttribute('src')" />`;
     }
