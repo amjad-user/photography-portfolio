@@ -9,22 +9,27 @@ const getToken  = ()         => localStorage.getItem(TOKEN_KEY);
 const setToken  = (t)        => localStorage.setItem(TOKEN_KEY, t);
 const clearToken= ()         => localStorage.removeItem(TOKEN_KEY);
 
-/** Fetch wrapper that injects the Bearer token and handles 401 */
+/** Fetch wrapper that injects the Bearer token, handles 401/403, and catches network errors. */
 async function authFetch(url, opts = {}) {
   const token = getToken();
-  const res   = await fetch(url, {
-    ...opts,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      ...(opts.headers || {}),
-    },
-  });
-  if (res.status === 401 || res.status === 403) {
-    clearToken();
-    showLogin();
+  try {
+    const res = await fetch(url, {
+      ...opts,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(opts.headers || {}),
+      },
+    });
+    if (res.status === 401 || res.status === 403) {
+      clearToken();
+      showLogin();
+      return null;
+    }
+    return res;
+  } catch (err) {
+    console.error('[authFetch] Network error for', url, '—', err.message);
     return null;
   }
-  return res;
 }
 
 // ── Alert helpers ─────────────────────────────────────────────────────────────
@@ -34,6 +39,38 @@ function showAlert(id, msg, type = 'ok') {
   el.textContent = msg;
   el.className   = `alert show alert-${type}`;
   setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+/**
+ * Returns a Promise<boolean> resolved by the custom confirm modal.
+ * Used instead of window.confirm() because iOS Safari suppresses browser
+ * dialogs called inside async functions, silently returning false.
+ */
+function showConfirm(message) {
+  return new Promise(resolve => {
+    const modal     = document.getElementById('confirm-modal');
+    const msgEl     = document.getElementById('confirm-message');
+    const okBtn     = document.getElementById('confirm-ok');
+    const cancelBtn = document.getElementById('confirm-cancel');
+
+    msgEl.textContent = message;
+    modal.classList.add('open');
+
+    function finish(result) {
+      modal.classList.remove('open');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onOverlay);
+      resolve(result);
+    }
+    const onOk       = () => finish(true);
+    const onCancel   = () => finish(false);
+    const onOverlay  = e => { if (e.target === modal) finish(false); };
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('click', onOverlay);
+  });
 }
 
 // ── Section navigation ────────────────────────────────────────────────────────
@@ -89,6 +126,7 @@ document.getElementById('login-form').addEventListener('submit', async e => {
     const data = await res.json();
     if (res.ok) {
       setToken(data.token);
+      localStorage.setItem('admin_email', data.email || '');
       showApp(data.email);
     } else {
       errEl.textContent = data.error || 'Login failed.';
@@ -105,6 +143,7 @@ document.getElementById('login-form').addEventListener('submit', async e => {
 document.getElementById('logout-btn').addEventListener('click', e => {
   e.preventDefault();
   clearToken();
+  localStorage.removeItem('admin_email');
   showLogin();
 });
 
@@ -369,24 +408,37 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
 
 // ── PHOTOS — Delete ───────────────────────────────────────────────────────────
 async function deletePhoto(id) {
-  if (!confirm('Delete this item? This cannot be undone.')) return;
+  const ok = await showConfirm('Delete this item? This cannot be undone.');
+  if (!ok) return;
+
+  const card      = document.getElementById(`photo-card-${id}`);
+  const deleteBtn = card?.querySelector('.btn-danger');
+  if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…'; }
+
   const res = await authFetch(`/api/admin/photos/${id}`, { method: 'DELETE' });
-  if (!res) return;
+
+  if (!res) {
+    // Network error or session expired
+    if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
+    showAlert('media-alert', 'Network error — could not delete item. Check your connection.', 'err');
+    return;
+  }
+
   if (res.ok) {
-    document.getElementById(`photo-card-${id}`)?.remove();
+    card?.remove();
   } else {
-    const d = await res.json();
-    alert(d.error || 'Delete failed.');
+    const d = await res.json().catch(() => ({}));
+    if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
+    showAlert('media-alert', d.error || 'Delete failed.', 'err');
   }
 }
 
 // ── PHOTOS — Edit Modal ───────────────────────────────────────────────────────
 async function openEditModal(id) {
-  const res = await authFetch('/api/admin/photos');
+  const res = await authFetch(`/api/admin/photos/${id}`);
   if (!res) return;
-  const photos = await res.json();
-  const photo  = photos.find(p => p.id === id);
-  if (!photo) return;
+  const photo = await res.json().catch(() => null);
+  if (!photo || photo.error) { console.error('[openEditModal] Photo not found:', id); return; }
 
   const isVideo = photo.media_type === 'video';
 
@@ -589,9 +641,16 @@ async function markRead(id) {
 }
 
 async function deleteMsg(id) {
-  if (!confirm('Delete this message?')) return;
+  const ok = await showConfirm('Delete this message? This cannot be undone.');
+  if (!ok) return;
   const res = await authFetch(`/api/admin/messages/${id}`, { method: 'DELETE' });
-  if (res?.ok) document.getElementById(`msg-${id}`)?.remove();
+  if (!res) return;
+  if (res.ok) {
+    document.getElementById(`msg-${id}`)?.remove();
+  } else {
+    const d = await res.json().catch(() => ({}));
+    console.error('[deleteMsg] Failed:', d.error);
+  }
 }
 
 // ── SETTINGS — Change Password ────────────────────────────────────────────────
@@ -674,7 +733,7 @@ function formatDate(iso) {
     // Verify token is still valid
     fetch('/api/admin/stats', { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => {
-        if (r.ok) return r.json().then(d => { showApp(); updateUnreadBadge(d.unreadMessages); });
+        if (r.ok) return r.json().then(d => { showApp(localStorage.getItem('admin_email') || ''); updateUnreadBadge(d.unreadMessages); });
         clearToken(); showLogin();
       })
       .catch(() => { clearToken(); showLogin(); });

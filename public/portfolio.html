@@ -67,6 +67,11 @@
     let allPhotos = [];
     let filtered  = [];
 
+    // Persistent array passed to initLightbox — mutated in-place so the lightbox
+    // closure always sees the current filtered set without re-registering listeners.
+    const lbPhotos     = [];
+    let   lbWiredUp    = false;
+
     async function loadPortfolio() {
       const [settings, photos, categories] = await Promise.all([
         fetch('/api/settings').then(r => r.json()),
@@ -111,6 +116,7 @@
       const grid = document.getElementById('photo-grid');
       if (!photos.length) {
         grid.innerHTML = '<div class="empty-state"><p>No photos in this category.</p></div>';
+        lbPhotos.length = 0;
         return;
       }
       grid.innerHTML = photos.map((p, i) => {
@@ -127,7 +133,15 @@
         `;
       }).join('');
 
-      initLightbox(filtered, grid);
+      // Keep lbPhotos in sync with the current filter — the lightbox closure holds a
+      // reference to this array, so mutating it in-place keeps navigation correct
+      // without re-registering event listeners (which would stack and fire multiple times).
+      lbPhotos.splice(0, lbPhotos.length, ...photos);
+
+      if (!lbWiredUp) {
+        initLightbox(lbPhotos, grid);
+        lbWiredUp = true;
+      }
     }
 
     // Capitalize first letter
