@@ -35,10 +35,11 @@ async function authFetch(url, opts = {}) {
 // ── Alert helpers ─────────────────────────────────────────────────────────────
 function showAlert(id, msg, type = 'ok') {
   const el = document.getElementById(id);
-  if (!el) return;
+  if (!el) { console.warn('[alert] element not found:', id, '|', msg); return; }
   el.textContent = msg;
   el.className   = `alert show alert-${type}`;
-  setTimeout(() => el.classList.remove('show'), 5000);
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => el.classList.remove('show'), 10000);
 }
 
 /**
@@ -52,15 +53,20 @@ function showConfirm(message) {
   const okBtn     = document.getElementById('confirm-ok');
   const cancelBtn = document.getElementById('confirm-cancel');
 
+  console.log('[confirm] elements found:', { modal: !!modal, msgEl: !!msgEl, okBtn: !!okBtn, cancelBtn: !!cancelBtn });
+
   if (!modal || !msgEl || !okBtn || !cancelBtn) {
+    console.warn('[confirm] missing modal elements — falling back to window.confirm');
     return Promise.resolve(window.confirm(message));
   }
 
   return new Promise(resolve => {
     msgEl.textContent = message;
     modal.classList.add('open');
+    console.log('[confirm] modal opened, waiting for user…');
 
     function finish(result) {
+      console.log('[confirm] finish called, result=', result);
       modal.classList.remove('open');
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
@@ -220,8 +226,8 @@ async function loadPhotos() {
           <div class="admin-photo-meta">${escAdmin(p.category)} &bull; ${formatDate(p.created_at)}</div>
           ${p.featured ? '<span class="featured-badge">Featured</span>' : ''}
           <div class="admin-photo-actions" style="margin-top:.5rem;">
-            <button class="btn btn-sm" onclick="openEditModal(${p.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="deletePhoto(${p.id})">Delete</button>
+            <button class="btn btn-sm" onclick="openEditModal('${p.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deletePhoto('${p.id}')">Delete</button>
           </div>
         </div>
       </div>
@@ -423,28 +429,54 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
 
 // ── PHOTOS — Delete ───────────────────────────────────────────────────────────
 async function deletePhoto(id) {
-  const ok = await showConfirm('Delete this item? This cannot be undone.');
+  console.log('[delete] deletePhoto called, id=', id, typeof id);
+
+  // Step 1 — confirm
+  let ok;
+  try {
+    ok = await showConfirm('Delete this item? This cannot be undone.');
+  } catch (err) {
+    console.error('[delete] showConfirm threw:', err);
+    ok = window.confirm('Delete this item? This cannot be undone.');
+  }
+  console.log('[delete] confirmed=', ok);
   if (!ok) return;
 
+  // Step 2 — update UI
   const card      = document.getElementById(`photo-card-${id}`);
   const deleteBtn = card?.querySelector('.btn-danger');
+  console.log('[delete] card element:', card ? 'found' : 'NOT FOUND (id=photo-card-' + id + ')');
   if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…'; }
 
-  const res = await authFetch(`/api/admin/photos/${id}`, { method: 'DELETE' });
+  // Step 3 — send DELETE request
+  console.log('[delete] sending DELETE /api/admin/photos/' + id);
+  let res;
+  try {
+    res = await authFetch(`/api/admin/photos/${id}`, { method: 'DELETE' });
+  } catch (err) {
+    console.error('[delete] authFetch threw:', err);
+    if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
+    showAlert('media-alert', 'Network error: ' + err.message, 'err');
+    return;
+  }
+
+  console.log('[delete] response:', res ? `status=${res.status} ok=${res.ok}` : 'null (authFetch returned null)');
 
   if (!res) {
-    // Network error or session expired
     if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
-    showAlert('media-alert', 'Network error — could not delete item. Check your connection.', 'err');
+    showAlert('media-alert', 'Network error — could not reach the server. Are you logged in?', 'err');
     return;
   }
 
   if (res.ok) {
+    console.log('[delete] success — removing card from DOM');
     card?.remove();
   } else {
-    const d = await res.json().catch(() => ({}));
+    let d = {};
+    try { d = await res.json(); } catch { /* ignore */ }
+    console.error('[delete] server returned error:', res.status, d);
     if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
-    showAlert('media-alert', d.error || 'Delete failed.', 'err');
+    showAlert('media-alert', `Delete failed (HTTP ${res.status}): ${d.error || d.detail || 'unknown error'}`, 'err');
   }
 }
 
@@ -624,7 +656,7 @@ async function loadMessages() {
   const list = document.getElementById('msgs-list');
   list.innerHTML = msgs.map(m => `
     <div class="msg-item ${m.is_read ? '' : 'unread'}" id="msg-${m.id}">
-      <div class="msg-head" onclick="toggleMsg(${m.id})">
+      <div class="msg-head" onclick="toggleMsg('${m.id}')">
         <div>
           <div class="msg-sender">${escAdmin(m.name)} ${m.is_read ? '' : '<sup style="color:var(--accent);font-size:.7rem;">NEW</sup>'}</div>
           <div class="msg-email">${escAdmin(m.email)}</div>
@@ -635,8 +667,8 @@ async function loadMessages() {
         <p>${escAdmin(m.message).replace(/\n/g, '<br>')}</p>
         <div class="msg-actions">
           <a href="mailto:${escAdmin(m.email)}?subject=Re: Your enquiry" class="btn btn-sm">Reply via Email</a>
-          ${!m.is_read ? `<button class="btn btn-sm" onclick="markRead(${m.id})">Mark as Read</button>` : ''}
-          <button class="btn btn-sm btn-danger" onclick="deleteMsg(${m.id})">Delete</button>
+          ${!m.is_read ? `<button class="btn btn-sm" onclick="markRead('${m.id}')">Mark as Read</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteMsg('${m.id}')">Delete</button>
         </div>
       </div>
     </div>
