@@ -7,19 +7,29 @@ const supabase = require('./supabase/client');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Uploads directory (local dev only — Vercel filesystem is read-only) ────────
+// Uploads directory (local dev only — Vercel filesystem is read-only)
 if (process.env.VERCEL !== '1') {
   const uploadsDir = path.join(__dirname, 'uploads');
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   app.use('/uploads', express.static(uploadsDir));
 }
 
-// ── Middleware ─────────────────────────────────────────────────────────────────
+// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Admin SPA — registered BEFORE express.static.
+// express.static sees public/admin/ is a directory and returns a 301 redirect
+// to /admin/ which on Vercel (nft does not trace path.join(__dirname,'public'))
+// causes a 500. Registering the route first serves the file directly as 200.
+app.get('/admin', (_req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'))
+);
+
+// Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Ensure Supabase Storage bucket exists ──────────────────────────────────────
+// Ensure Supabase Storage bucket exists
 (async () => {
   try {
     const { error } = await supabase.storage.createBucket('photos', {
@@ -40,16 +50,11 @@ app.use(express.static(path.join(__dirname, 'public')));
   }
 })();
 
-// ── API Routes ─────────────────────────────────────────────────────────────────
+// API Routes
 app.use('/api',       require('./routes/api'));
 app.use('/api/admin', require('./routes/admin'));
 
-// ── Admin SPA ──────────────────────────────────────────────────────────────────
-app.get('/admin', (_req, res) =>
-  res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'))
-);
-
-// ── Start (local dev only — Vercel handles listening itself) ───────────────────
+// Start (local dev only — Vercel handles listening itself)
 if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     console.log('\n  Photography Portfolio is running!\n');
